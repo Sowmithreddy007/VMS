@@ -597,6 +597,7 @@ $notes_actions = mysqli_query($conn, "SELECT * FROM tbl_coordinator_notes WHERE 
         </div>
         <div class="modal-body">
           <form id="eventForm">
+            <input type="hidden" name="csrf_token" value="<?php echo $_SESSION['csrf_token']; ?>">
             <div class="mb-3">
               <label class="form-label">Event Name</label>
               <input type="text" class="form-control" name="event_name" required placeholder="Enter event name">

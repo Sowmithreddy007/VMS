@@ -74,7 +74,7 @@ $breadcrumbs = [
             <tr>
               <td><?php echo $sn; ?></td>
               <td><?php echo htmlspecialchars($row['note_type']); ?></td>
-              <td><?php echo htmlspecialchars(substr($row['note_content'], 0, 50)) . (strlen($row['note_content']) > 50 ? '...' : ''); ?></td>
+              <td><?php echo htmlspecialchars(substr($row['content'], 0, 50)) . (strlen($row['content']) > 50 ? '...' : ''); ?></td>
               <td>
                 <span class="badge <?php 
                   if($row['priority'] == 'High') echo 'text-bg-danger-subtle text-danger border border-danger';

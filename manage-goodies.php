@@ -59,13 +59,39 @@ $breadcrumbs = [
             <?php
             if(isset($_GET['ids'])){
               $id = $_GET['ids'];
-              $delete_query = mysqli_query($conn, "DELETE FROM tbl_goodies_distribution WHERE id='$id'");
+              // Validate CSRF token
+              if (!isset($_POST['csrf_token']) || !hash_equals($_SESSION['csrf_token'], $_POST['csrf_token'])) {
+                  die("Invalid CSRF token");
+              }
+              
+              $stmt = $conn->prepare("DELETE FROM tbl_goodies_distribution WHERE id = ?");
+              $stmt->bind_param("i", $id);
+              $delete_query = $stmt->execute();
               if($delete_query) {
                 echo "<script>alert('Goodie distribution record deleted successfully');</script>";
               }
             }
             
-            $select_query = mysqli_query($conn, "SELECT gd.*, v.name as visitor_name 
+            // Secure goodies listing query
+            $sql = "SELECT gd.id, gd.visitor_id, gd.goodie_name, gd.quantity, "
+                 . "gd.distributed_by, gd.created_at, v.name AS visitor_name "
+                 . "FROM tbl_goodies_distribution gd "
+                 . "LEFT JOIN tbl_visitors v ON gd.visitor_id = v.id "
+                 . "ORDER BY gd.created_at DESC";
+
+            $stmt = $conn->prepare($sql);
+            if (!$stmt) {
+                die("Database error: " . htmlspecialchars($conn->error));
+            }
+            
+            if (!$stmt->execute()) {
+                die("Execution failed: " . htmlspecialchars($stmt->error));
+            }
+            
+            $select_query = $stmt->get_result();
+            $stmt->close();
+            $stmt->execute();
+            $select_query = $stmt->get_result();
                                                FROM tbl_goodies_distribution gd 
                                                LEFT JOIN tbl_visitors v ON gd.visitor_id = v.id 
                                                ORDER BY gd.created_at DESC");
@@ -76,7 +102,7 @@ $breadcrumbs = [
             <tr>
               <td><?php echo $sn; ?></td>
               <td><?php echo htmlspecialchars($row['visitor_name']); ?></td>
-              <td><?php echo htmlspecialchars($row['goodie_type']); ?></td>
+              <td><?php echo htmlspecialchars($row['goodie_name']); ?></td>
               <td><?php echo htmlspecialchars($row['quantity']); ?></td>
               <td><?php echo htmlspecialchars($row['distributed_by']); ?></td>
               <td><?php echo date('M d, Y', strtotime($row['created_at'])); ?></td>

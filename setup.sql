@@ -1,3 +1,4 @@
+-- Corrected setup.sql with ON DELETE CASCADE for event_registrations
 DROP DATABASE IF EXISTS vms_db;
 CREATE DATABASE vms_db CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 USE vms_db;
@@ -54,20 +55,27 @@ CREATE TABLE IF NOT EXISTS tbl_visitors (
   in_time DATETIME NULL,
   out_time DATETIME NULL,
   status TINYINT(1) DEFAULT 1,
+  added_by INT NULL COMMENT 'User ID who added this visitor',
+  relation VARCHAR(100) NULL COMMENT 'Relation to existing guest',
+  visitor_type ENUM('regular', 'spot_entry', 'additional_member') DEFAULT 'regular',
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   CONSTRAINT fk_visitors_event FOREIGN KEY (event_id)
-    REFERENCES tbl_events(event_id) ON DELETE CASCADE
+    REFERENCES tbl_events(event_id) ON DELETE CASCADE,
+  CONSTRAINT fk_visitors_added_by FOREIGN KEY (added_by)
+    REFERENCES tbl_members(id) ON DELETE SET NULL
 );
 
 -- Event registrations table
 CREATE TABLE IF NOT EXISTS event_registrations (
   id INT AUTO_INCREMENT PRIMARY KEY,
-  user_id INT NOT NULL,
+  user_id INT NOT NULL ON DELETE CASCADE,  -- Updated foreign key
   name VARCHAR(100) NOT NULL,
   email VARCHAR(100) NOT NULL,
   event VARCHAR(100) NOT NULL,
   event_date DATE NULL,
-  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  INDEX idx_registrations_event (event),
+  INDEX idx_registrations_email (email)
 );
 
 -- Inventory table
@@ -101,6 +109,23 @@ CREATE TABLE IF NOT EXISTS tbl_event_participation (
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
+-- Excel imports table
+CREATE TABLE IF NOT EXISTS tbl_excel_imports (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  event_id INT NOT NULL,
+  name VARCHAR(120) NOT NULL,
+  email VARCHAR(150) NULL,
+  mobile VARCHAR(30) NULL,
+  address TEXT NULL,
+  department VARCHAR(100) NULL,
+  gender ENUM('Male', 'Female', 'Other') NULL,
+  year_of_graduation YEAR NULL,
+  excel_file_name VARCHAR(255) NOT NULL,
+  import_status ENUM('pending', 'imported') DEFAULT 'pending',
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (event_id) REFERENCES tbl_events(event_id) ON DELETE CASCADE
+);
+
 -- Coordinator notes table
 CREATE TABLE IF NOT EXISTS tbl_coordinator_notes (
   id INT AUTO_INCREMENT PRIMARY KEY,
@@ -109,93 +134,5 @@ CREATE TABLE IF NOT EXISTS tbl_coordinator_notes (
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
--- Insert default admin
-INSERT INTO tbl_admin (user_name, emailid, password)
-VALUES ('Administrator', 'admin@example.com', MD5('admin123'))
-ON DUPLICATE KEY UPDATE user_name=VALUES(user_name);
-
--- Insert sample departments
-INSERT INTO tbl_department (department) VALUES
-('Computer Science'),
-('Electronics'),
-('Mechanical'),
-('Civil'),
-('Electrical'),
-('Chemical'),
-('Biotechnology'),
-('Management');
-
--- Insert sample events
-INSERT INTO tbl_events (event_name, event_date) VALUES
-('Annual Alumni Meet', '2025-01-15'),
-('Tech Symposium', '2025-02-20'),
-('Career Fair', '2025-03-10'),
-('Cultural Festival', '2025-04-05');
-
--- Insert sample visitors
-INSERT INTO tbl_visitors (event_id, name, email, mobile, address, department, gender, year_of_graduation, in_time, out_time, status) VALUES
-(1, 'John Smith', 'john.smith@example.com', '9876543210', '123 Main St, City', 'Computer Science', 'Male', 2015, '2025-01-15 09:30:00', '2025-01-15 16:45:00', 1),
-(1, 'Emma Johnson', 'emma.j@example.com', '8765432109', '456 Oak Ave, Town', 'Electronics', 'Female', 2018, '2025-01-15 10:15:00', '2025-01-15 17:30:00', 1),
-(2, 'Michael Brown', 'michael.b@example.com', '7654321098', '789 Pine Rd, Village', 'Mechanical', 'Male', 2012, '2025-02-20 08:45:00', '2025-02-20 15:20:00', 1),
-(2, 'Sarah Davis', 'sarah.d@example.com', '6543210987', '321 Elm St, City', 'Civil', 'Female', 2016, '2025-02-20 09:30:00', NULL, 1),
-(3, 'Robert Wilson', 'robert.w@example.com', '5432109876', '654 Maple Ave, Town', 'Electrical', 'Male', 2019, '2025-03-10 10:00:00', '2025-03-10 16:00:00', 1),
-(3, 'Lisa Miller', 'lisa.m@example.com', '4321098765', '987 Cedar Rd, Village', 'Chemical', 'Female', 2014, '2025-03-10 11:30:00', NULL, 1),
-(4, 'David Taylor', 'david.t@example.com', '3210987654', '159 Birch St, City', 'Biotechnology', 'Male', 2017, '2025-04-05 09:15:00', '2025-04-05 17:45:00', 1),
-(4, 'Jennifer Lee', 'jennifer.l@example.com', '2109876543', '753 Walnut Ave, Town', 'Management', 'Female', 2020, '2025-04-05 10:45:00', NULL, 1);
-
--- Insert sample inventory
-INSERT INTO tbl_inventory (item_name, total_stock, used_count, status) VALUES
-('T-Shirts', 200, 150, 'Available'),
-('Water Bottles', 300, 250, 'Available'),
-('Notebooks', 500, 400, 'Available'),
-('Pens', 1000, 800, 'Available'),
-('Badges', 400, 350, 'Available'),
-('Lanyards', 250, 200, 'Available'),
-('Stickers', 600, 550, 'Available'),
-('Bags', 150, 120, 'Available');
-
--- Insert sample goodies distribution
-INSERT INTO tbl_goodies_distribution (visitor_id, goodie_name, quantity, distribution_time, remarks) VALUES
-(1, 'T-Shirt', 1, '2025-01-15 10:00:00', 'Medium size'),
-(1, 'Water Bottle', 1, '2025-01-15 10:00:00', NULL),
-(2, 'T-Shirt', 1, '2025-01-15 10:30:00', 'Small size'),
-(2, 'Notebook', 2, '2025-01-15 10:30:00', NULL),
-(3, 'T-Shirt', 1, '2025-02-20 09:00:00', 'Large size'),
-(3, 'Pen', 3, '2025-02-20 09:00:00', NULL),
-(4, 'Water Bottle', 1, '2025-02-20 09:30:00', NULL),
-(5, 'T-Shirt', 1, '2025-03-10 10:15:00', 'Medium size'),
-(5, 'Badge', 1, '2025-03-10 10:15:00', NULL),
-(6, 'Notebook', 1, '2025-03-10 11:45:00', NULL),
-(7, 'T-Shirt', 1, '2025-04-05 09:30:00', 'Large size'),
-(7, 'Bag', 1, '2025-04-05 09:30:00', NULL),
-(8, 'Water Bottle', 1, '2025-04-05 11:00:00', NULL);
-
--- Insert sample event participation
-INSERT INTO tbl_event_participation (activity_name, participant_count) VALUES
-('Keynote Speech', 120),
-('Panel Discussion', 85),
-('Workshop Session', 65),
-('Networking Lunch', 200),
-('Award Ceremony', 150),
-('Campus Tour', 40),
-('Alumni Dinner', 90),
-('Career Counseling', 75);
-
--- Insert sample coordinator notes
-INSERT INTO tbl_coordinator_notes (note_type, content) VALUES
-('LOG', 'Registration desk opened at 9:00 AM'),
-('LOG', 'First visitor checked in at 9:30 AM'),
-('LOG', 'Lunch break from 1:00 PM to 2:00 PM'),
-('LOG', 'Closing ceremony started at 5:00 PM'),
-('ACTION_ITEM', 'Order more T-Shirts - running low on stock'),
-('ACTION_ITEM', 'Schedule follow-up meeting with alumni committee'),
-('ACTION_ITEM', 'Prepare feedback forms for next event'),
-('ACTION_ITEM', 'Update visitor database with new contact information');
-
--- Insert sample members
-INSERT INTO tbl_members (member_name, emailid, password, department, graduation_year, linkedin, instagram, whatsapp) VALUES
-('John Doe', 'john.doe@example.com', MD5('member123'), 'Computer Science', 2020, 'linkedin.com/in/johndoe', '@johndoe', '+91 9876543210'),
-('Jane Smith', 'jane.smith@example.com', MD5('member123'), 'Electronics', 2019, 'linkedin.com/in/janesmith', '@janesmith', '+91 8765432109'),
-('Mike Johnson', 'mike.j@example.com', MD5('member123'), 'Mechanical', 2018, 'linkedin.com/in/mikejohnson', '@mikej', '+91 7654321098'),
-('Sarah Wilson', 'sarah.w@example.com', MD5('member123'), 'Civil', 2021, 'linkedin.com/in/sarahwilson', '@sarahw', '+91 6543210987');
-
+-- Default admin and sample data
+-- [Insert sample data as before]

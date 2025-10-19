@@ -47,10 +47,8 @@ $breadcrumbs = [
           <thead>
             <tr>
               <th>S.No.</th>
-              <th>Visitor Name</th>
-              <th>Event Name</th>
-              <th>Participation Type</th>
-              <th>Status</th>
+              <th>Activity Name</th>
+              <th>Participant Count</th>
               <th>Date</th>
               <th>Actions</th>
             </tr>
@@ -65,25 +63,15 @@ $breadcrumbs = [
               }
             }
             
-            $select_query = mysqli_query($conn, "SELECT ep.*, v.name as visitor_name, e.event_name 
-                                               FROM tbl_event_participation ep 
-                                               LEFT JOIN tbl_visitors v ON ep.visitor_id = v.id 
-                                               LEFT JOIN tbl_events e ON ep.event_id = e.id 
-                                               ORDER BY ep.created_at DESC");
+            $select_query = mysqli_query($conn, "SELECT * FROM tbl_event_participation ORDER BY created_at DESC");
             $sn = 1;
             while($row = mysqli_fetch_array($select_query))
             {
             ?>
             <tr>
               <td><?php echo $sn; ?></td>
-              <td><?php echo htmlspecialchars($row['visitor_name']); ?></td>
-              <td><?php echo htmlspecialchars($row['event_name']); ?></td>
-              <td><?php echo htmlspecialchars($row['participation_type']); ?></td>
-              <td>
-                <span class="badge <?php echo $row['status'] == 'Completed' ? 'text-bg-success-subtle text-success border border-success' : 'text-bg-warning-subtle text-warning border border-warning'; ?>">
-                  <?php echo htmlspecialchars($row['status']); ?>
-                </span>
-              </td>
+              <td><?php echo htmlspecialchars($row['activity_name']); ?></td>
+              <td><?php echo htmlspecialchars($row['participant_count']); ?></td>
               <td><?php echo date('M d, Y', strtotime($row['created_at'])); ?></td>
               <td>
                 <div class="d-flex gap-2">

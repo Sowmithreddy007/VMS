@@ -18,36 +18,38 @@ $popup_type = '';
 
 // Handle Save / Update Visitor
 if(isset($_POST['sv-vstr'])) {
-    $fullname   = mysqli_real_escape_string($conn, $_POST['fullname']);
-    $email    = mysqli_real_escape_string($conn, $_POST['email']);
-    $mobile     = mysqli_real_escape_string($conn, $_POST['mobile']);
-    $address    = mysqli_real_escape_string($conn, $_POST['address']);
-    $department = mysqli_real_escape_string($conn, $_POST['department']);
+    $fullname   = $_POST['fullname'];
+    $email    = $_POST['email'];
+    $mobile     = $_POST['mobile'];
+    $address    = $_POST['address'];
+    $department = $_POST['department'];
+    $gender     = $_POST['gender'];
+    $year       = $_POST['year_of_graduation'];
     $status     = $_POST['status'];
 
-    if($status == 0) {
-        $update_visitor = mysqli_query($conn, "
-            UPDATE tbl_visitors 
-            SET name='$fullname', email='$email', mobile='$mobile',
-                address='$address', department='$department', status='$status', out_time=NOW() 
-            WHERE id='$id'
-        ");
-    } else {
-        $update_visitor = mysqli_query($conn, "
-            UPDATE tbl_visitors 
-            SET name='$fullname', email='$email', mobile='$mobile',
-                address='$address', department='$department', status='$status' 
-            WHERE id='$id'
-        ");
-    }
+    $sql = "UPDATE tbl_visitors
+            SET name=?, email=?, mobile=?, address=?, department=?, gender=?, year_of_graduation=?, status=?";
+    $params = "sssssssi";
+    $values = [$fullname, $email, $mobile, $address, $department, $gender, $year, $status];
 
-    if($update_visitor) {
+    if($status == 0) {
+        $sql .= ", out_time=NOW()";
+    }
+    $sql .= " WHERE id=?";
+    $params .= "i";
+    $values[] = $id;
+
+    $stmt = $conn->prepare($sql);
+    $stmt->bind_param($params, ...$values);
+    
+    if($stmt->execute()) {
         $popup_message = "Visitor updated successfully!";
         $popup_type = "success";
     } else {
-        $popup_message = "Error updating visitor!";
+        $popup_message = "Error updating visitor: " . $stmt->error;
         $popup_type = "danger";
     }
+    $stmt->close();
 }
 ?>
 
@@ -70,68 +72,104 @@ if(isset($_POST['sv-vstr'])) {
                     <div class="form-group row">
                         <label class="col-lg-4 col-form-label">Name</label>
                         <div class="col-lg-6">
-                            <input type="text" name="fullname" class="form-control" value="<?php echo $row['name']; ?>" readonly>
+                            <input type="text" name="fullname" class="form-control"
+                                value="<?php echo htmlspecialchars($row['name']); ?>"
+                                pattern="[A-Za-z ]{3,50}"
+                                title="3-50 alphabetic characters" required>
+                            <div class="invalid-feedback">Please enter a valid name (3-50 letters)</div>
                         </div>
                     </div>
                     <!-- Email -->
                     <div class="form-group row">
                         <label class="col-lg-4 col-form-label">Email</label>
                         <div class="col-lg-6">
-                            <input type="email" name="email" class="form-control" value="<?php echo $row['email']; ?>" readonly>
+                            <input type="email" name="email" class="form-control" value="<?php echo htmlspecialchars($row['email']); ?>" required>
                         </div>
                     </div>
                     <!-- Mobile -->
                     <div class="form-group row">
                         <label class="col-lg-4 col-form-label">Mobile</label>
                         <div class="col-lg-6">
-                            <input type="text" name="mobile" class="form-control" value="<?php echo $row['mobile']; ?>" readonly>
+                            <input type="text" name="mobile" class="form-control" value="<?php echo htmlspecialchars($row['mobile']); ?>" required>
                         </div>
                     </div>
                     <!-- Address -->
                     <div class="form-group row">
                         <label class="col-lg-4 col-form-label">Address</label>
                         <div class="col-lg-6">
-                            <textarea name="address" class="form-control" readonly><?php echo $row['address']; ?></textarea>
+                            <textarea name="address" class="form-control" required><?php echo htmlspecialchars($row['address']); ?></textarea>
                         </div>
                     </div>
                     <!-- Department -->
                     <div class="form-group row">
                         <label class="col-lg-4 col-form-label">Department</label>
                         <div class="col-lg-6">
-                            <input type="text" name="department" class="form-control" value="<?php echo $row['department']; ?>" readonly>
+                            <select name="department" class="form-control" required>
+                                <option value="">Select Department</option>
+                                <?php
+                                $select_department = mysqli_query($conn,"SELECT * FROM tbl_department WHERE status=1 ORDER BY department ASC");
+                                while($dept = mysqli_fetch_assoc($select_department)){
+                                    $selected = ($row['department'] == $dept['department']) ? 'selected' : '';
+                                    echo "<option value='".$dept['department']."' ".$selected.">".$dept['department']."</option>";
+                                }
+                                ?>
+                            </select>
+                        </div>
+                    </div>
+                    <!-- Gender -->
+                    <div class="form-group row">
+                        <label class="col-lg-4 col-form-label">Gender</label>
+                        <div class="col-lg-6">
+                            <select name="gender" class="form-control" required>
+                                <option value="">Select Gender</option>
+                                <option value="Male" <?php echo ($row['gender'] == 'Male') ? 'selected' : ''; ?>>Male</option>
+                                <option value="Female" <?php echo ($row['gender'] == 'Female') ? 'selected' : ''; ?>>Female</option>
+                                <option value="Other" <?php echo ($row['gender'] == 'Other') ? 'selected' : ''; ?>>Other</option>
+                            </select>
+                        </div>
+                    </div>
+                    <!-- Year of Graduation -->
+                    <div class="form-group row">
+                        <label class="col-lg-4 col-form-label">Year of Graduation</label>
+                        <div class="col-lg-6">
+                            <select name="year_of_graduation" class="form-control" required>
+                                <option value="">Select Year</option>
+                                <?php for($y = 2007; $y <= date("Y"); $y++){
+                                    $selected = ($row['year_of_graduation'] == $y) ? 'selected' : '';
+                                    echo "<option value='$y' ".$selected.">$y</option>";
+                                } ?>
+                            </select>
                         </div>
                     </div>
                     <!-- In Time -->
                     <div class="form-group row">
                         <label class="col-lg-4 col-form-label">In Time</label>
                         <div class="col-lg-6">
-                            <input type="text" class="form-control" value="<?php echo $row['in_time']; ?>" readonly>
+                            <input type="text" class="form-control" value="<?php echo htmlspecialchars($row['in_time']); ?>" readonly>
+                        </div>
+                    </div>
+                    <!-- Out Time -->
+                    <div class="form-group row">
+                        <label class="col-lg-4 col-form-label">Out Time</label>
+                        <div class="col-lg-6">
+                            <input type="text" class="form-control" value="<?php echo htmlspecialchars($row['out_time'] ?: 'N/A'); ?>" readonly>
                         </div>
                     </div>
                     <!-- Status -->
                     <div class="form-group row">
-                        <?php if($row['status']==1){ ?>
-                            <label class="col-lg-4 col-form-label">Status</label>
-                            <div class="col-lg-6">
-                                <select name="status" class="form-control" required>
-                                    <option value="1" selected>In</option>
-                                    <option value="0">Out</option>
-                                </select>
-                            </div>
-                        <?php } else { ?>
-                            <label class="col-lg-4 col-form-label">Out Time</label>
-                            <div class="col-lg-6">
-                                <input type="text" class="form-control" value="<?php echo $row['out_time']; ?>" readonly>
-                            </div>
-                        <?php } ?>
+                        <label class="col-lg-4 col-form-label">Status</label>
+                        <div class="col-lg-6">
+                            <select name="status" class="form-control" required>
+                                <option value="1" <?php echo ($row['status'] == 1) ? 'selected' : ''; ?>>In</option>
+                                <option value="0" <?php echo ($row['status'] == 0) ? 'selected' : ''; ?>>Out</option>
+                            </select>
+                        </div>
                     </div>
-                    <?php if($row['status']==1){ ?>
                     <div class="form-group row">
                         <div class="col-lg-8 ml-auto">
                             <button type="submit" name="sv-vstr" class="btn btn-primary">Save</button>
                         </div>
                     </div>
-                    <?php } ?>
                 </div>
             </form>
         </div>

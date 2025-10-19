@@ -20,10 +20,17 @@ $member_data = mysqli_fetch_assoc($member_query);
 // Fetch upcoming events
 $upcoming_events = mysqli_query($conn, "SELECT * FROM tbl_events WHERE event_date >= CURDATE() ORDER BY event_date ASC");
 
+// Fetch events for dropdowns
+$events_array = [];
+$events_result = mysqli_query($conn, "SELECT * FROM tbl_events WHERE event_date >= CURDATE() ORDER BY event_date ASC");
+while ($event = mysqli_fetch_assoc($events_result)) {
+    $events_array[] = $event;
+}
+
 // Fetch registered events for this member
-$registered_events_query = mysqli_query($conn, "SELECT er.*, e.event_name, e.event_date 
-                                                FROM event_registrations er 
-                                                JOIN tbl_events e ON er.event = e.event_name 
+$registered_events_query = mysqli_query($conn, "SELECT er.*, e.event_name, e.event_date
+                                                FROM event_registrations er
+                                                JOIN tbl_events e ON er.event = e.event_name
                                                 WHERE er.user_id='$id'");
 $registered_events = [];
 while ($row = mysqli_fetch_assoc($registered_events_query)) {
@@ -251,7 +258,113 @@ $announcements = mysqli_query($conn, "SELECT * FROM tbl_coordinator_notes WHERE 
         </ul>
       </div>
     </div>
-
+  
+    <!-- Spot Entry Form -->
+    <div class="card-lite mb-4">
+      <div class="card-head">
+        <div class="d-flex align-items-center gap-2">
+          <i class="fa-solid fa-user-plus text-primary"></i>
+          <span class="fw-semibold">Spot Entry - Manual Guest Registration</span>
+        </div>
+      </div>
+      <div class="card-body">
+        <form id="spotEntryForm" class="row g-3">
+          <div class="col-md-6">
+            <label class="form-label">Event <span class="text-danger">*</span></label>
+            <select class="form-select" name="event_id" required>
+              <option value="">Select Event</option>
+              <?php foreach ($events_array as $event): ?>
+              <option value="<?php echo $event['event_id']; ?>"><?php echo htmlspecialchars($event['event_name']); ?></option>
+              <?php endforeach; ?>
+            </select>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label">Full Name <span class="text-danger">*</span></label>
+            <input type="text" class="form-control" name="name" required>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label">Email Address</label>
+            <input type="email" class="form-control" name="email">
+          </div>
+          <div class="col-md-6">
+            <label class="form-label">Mobile Number</label>
+            <input type="tel" class="form-control" name="mobile" placeholder="+91 9876543210">
+          </div>
+          <div class="col-md-6">
+            <label class="form-label">Department</label>
+            <input type="text" class="form-control" name="department">
+          </div>
+          <div class="col-md-6">
+            <label class="form-label">Gender</label>
+            <select class="form-select" name="gender">
+              <option value="">Select Gender</option>
+              <option value="Male">Male</option>
+              <option value="Female">Female</option>
+              <option value="Other">Other</option>
+            </select>
+          </div>
+          <div class="col-12">
+            <button type="submit" class="btn btn-primary"><i class="fa-solid fa-plus me-2"></i> Add Spot Entry</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  
+    <!-- Add Additional Members Form -->
+    <div class="card-lite mb-4">
+      <div class="card-head">
+        <div class="d-flex align-items-center gap-2">
+          <i class="fa-solid fa-users text-success"></i>
+          <span class="fw-semibold">Add Additional Members (Family/Friends)</span>
+        </div>
+      </div>
+      <div class="card-body">
+        <form id="additionalMemberForm" class="row g-3">
+          <div class="col-md-6">
+            <label class="form-label">Event <span class="text-danger">*</span></label>
+            <select class="form-select" name="event_id" required>
+              <option value="">Select Event</option>
+              <?php foreach ($events_array as $event): ?>
+              <option value="<?php echo $event['event_id']; ?>"><?php echo htmlspecialchars($event['event_name']); ?></option>
+              <?php endforeach; ?>
+            </select>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label">Full Name <span class="text-danger">*</span></label>
+            <input type="text" class="form-control" name="name" required>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label">Email Address</label>
+            <input type="email" class="form-control" name="email">
+          </div>
+          <div class="col-md-6">
+            <label class="form-label">Mobile Number</label>
+            <input type="tel" class="form-control" name="mobile" placeholder="+91 9876543210">
+          </div>
+          <div class="col-md-6">
+            <label class="form-label">Department</label>
+            <input type="text" class="form-control" name="department">
+          </div>
+          <div class="col-md-6">
+            <label class="form-label">Gender</label>
+            <select class="form-select" name="gender">
+              <option value="">Select Gender</option>
+              <option value="Male">Male</option>
+              <option value="Female">Female</option>
+              <option value="Other">Other</option>
+            </select>
+          </div>
+          <div class="col-12">
+            <label class="form-label">Relation to Existing Guest (Optional)</label>
+            <input type="text" class="form-control" name="relation" placeholder="e.g., Family member, Friend, Colleague">
+          </div>
+          <div class="col-12">
+            <button type="submit" class="btn btn-success"><i class="fa-solid fa-user-plus me-2"></i> Add Member</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  
     <!-- Profile & Social Media -->
     <div class="card-lite mb-4">
       <div class="card-head">
@@ -507,6 +620,52 @@ $announcements = mysqli_query($conn, "SELECT * FROM tbl_coordinator_notes WHERE 
       })
       .catch(error => {
         alert('Error updating profile');
+      });
+    });
+
+    // Handle Spot Entry Form Submission
+    document.getElementById('spotEntryForm').addEventListener('submit', function(e) {
+      e.preventDefault();
+      const formData = new FormData(this);
+      
+      fetch('add_spot_entry.php', {
+        method: 'POST',
+        body: formData
+      })
+      .then(response => response.json())
+      .then(data => {
+        if (data.success) {
+          alert('Spot entry added successfully!');
+          this.reset();
+        } else {
+          alert('Error: ' + data.message);
+        }
+      })
+      .catch(error => {
+        alert('Error adding spot entry');
+      });
+    });
+
+    // Handle Additional Member Form Submission
+    document.getElementById('additionalMemberForm').addEventListener('submit', function(e) {
+      e.preventDefault();
+      const formData = new FormData(this);
+      
+      fetch('add_additional_member.php', {
+        method: 'POST',
+        body: formData
+      })
+      .then(response => response.json())
+      .then(data => {
+        if (data.success) {
+          alert('Additional member added successfully!');
+          this.reset();
+        } else {
+          alert('Error: ' + data.message);
+        }
+      })
+      .catch(error => {
+        alert('Error adding additional member');
       });
     });
   </script>

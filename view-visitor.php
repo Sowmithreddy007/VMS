@@ -10,11 +10,19 @@ if (!isset($_SESSION['id'])) {
 $event_id = $_GET['event_id'] ?? 0;
 
 // Fetch event name
-$event = mysqli_fetch_assoc(mysqli_query($conn, "SELECT event_name FROM tbl_events WHERE event_id = $event_id"));
+$stmt_event = $conn->prepare("SELECT event_name FROM tbl_events WHERE event_id = ?");
+$stmt_event->bind_param("i", $event_id);
+$stmt_event->execute();
+$event_result = $stmt_event->get_result();
+$event = $event_result->fetch_assoc();
 $event_name = $event['event_name'] ?? "Unknown Event";
+$stmt_event->close();
 
 // Fetch visitors
-$visitors = mysqli_query($conn, "SELECT * FROM tbl_visitors WHERE event_id = $event_id");
+$stmt_visitors = $conn->prepare("SELECT * FROM tbl_visitors WHERE event_id = ?");
+$stmt_visitors->bind_param("i", $event_id);
+$stmt_visitors->execute();
+$visitors = $stmt_visitors->get_result();
 ?>
 <!DOCTYPE html>
 <html>
@@ -25,7 +33,7 @@ $visitors = mysqli_query($conn, "SELECT * FROM tbl_visitors WHERE event_id = $ev
 </head>
 <body class="hold-transition sidebar-mini">
 <div class="wrapper">
-  <?php include 'side-nav.php'; ?>
+  <?php include 'Admin_dashbaord/side-bar.php'; ?>
 
   <div class="content-wrapper p-4">
     <h3>Visitors for: <?php echo htmlspecialchars($event_name); ?></h3>
@@ -36,7 +44,7 @@ $visitors = mysqli_query($conn, "SELECT * FROM tbl_visitors WHERE event_id = $ev
           <th>#</th>
           <th>Visitor Name</th>
           <th>Email</th>
-          <th>Phone</th>
+          <th>Mobile</th>
         </tr>
       </thead>
       <tbody>
@@ -45,12 +53,13 @@ $visitors = mysqli_query($conn, "SELECT * FROM tbl_visitors WHERE event_id = $ev
         while ($row = mysqli_fetch_assoc($visitors)) {
             echo "<tr>
                     <td>{$i}</td>
-                    <td>{$row['name']}</td>
-                    <td>{$row['email']}</td>
-                    <td>{$row['phone']}</td>
+                    <td>".htmlspecialchars($row['name'])."</td>
+                    <td>".htmlspecialchars($row['email'])."</td>
+                    <td>".htmlspecialchars($row['mobile'])."</td>
                   </tr>";
             $i++;
         }
+        $stmt_visitors->close();
         ?>
       </tbody>
     </table>

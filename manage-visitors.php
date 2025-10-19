@@ -22,6 +22,8 @@ if(empty($id))
     </div>
     <div class="d-flex gap-2">
       <button class="btn btn-primary" onclick="location.href='new-visitor.php'"><i class="fa-solid fa-plus me-2"></i>Add Visitor</button>
+      <button class="btn btn-success" onclick="location.href='excel-import.php'"><i class="fa-solid fa-file-excel me-2"></i>Import Excel</button>
+      <button class="btn btn-info" onclick="location.href='search-excel.php'"><i class="fa-solid fa-search me-2"></i>Search Excel</button>
       <button class="btn btn-outline-primary" onclick="location.reload()"><i class="fa-solid fa-arrow-rotate-right me-2"></i>Refresh</button>
     </div>
   </div>
@@ -96,7 +98,21 @@ if(empty($id))
               $from_date = date('Y-m-d', strtotime($from_date));
               $to_date = date('Y-m-d', strtotime($to_date));
 
-              $search_query = mysqli_query($conn, "select * from tbl_visitors where DATE(in_time)>='$from_date' and DATE(in_time)<='$to_date' or department='$dept'");
+              $sql = "SELECT * FROM tbl_visitors WHERE DATE(in_time) BETWEEN ? AND ?";
+              $params = [$from_date, $to_date];
+              $types = "ss";
+
+              if (!empty($dept)) {
+                  $sql .= " AND department=?";
+                  $params[] = $dept;
+                  $types .= "s";
+              }
+              
+              $stmt = $conn->prepare($sql);
+              $stmt->bind_param($types, ...$params);
+              $stmt->execute();
+              $search_query = $stmt->get_result();
+
               $sn = 1;
               while($row = mysqli_fetch_array($search_query))
             { ?>
@@ -116,17 +132,49 @@ if(empty($id))
                     <a href="edit-visitor.php?id=<?php echo $row['id'];?>" class="btn btn-sm btn-outline-primary">
                       <i class="fa-solid fa-pencil me-1"></i><?php echo $row['status']==1 ? 'Edit' : 'View'; ?>
                     </a>
-                    <a href="manage-visitors.php?ids=<?php echo $row['id'];?>" class="btn btn-sm btn-outline-danger" onclick="return confirmDelete()">
-                      <i class="fa-solid fa-trash me-1"></i>Delete
-                    </a>
+                    <form method="POST" action="manage-visitors.php" onsubmit="return confirmDelete()">
+                      <input type="hidden" name="csrf_token" value="<?= $_SESSION['csrf_token'] ?>">
+                        <input type="hidden" name="delete_visitor_id" value="<?php echo $row['id']; ?>">
+                        <button type="submit" class="btn btn-sm btn-outline-danger">
+                            <i class="fa-solid fa-trash me-1"></i>Delete
+                        </button>
+                    </form>
+                      <?php
+                      // Handle visitor deletion
+                      if(isset($_POST['delete_visitor_id'])) {
+                          // Validate CSRF token first
+                          if (!isset($_POST['csrf_token']) || $_POST['csrf_token'] !== $_SESSION['csrf_token']) {
+                              die("Invalid CSRF token");
+                          }
+                          
+                          $id = intval($_POST['delete_visitor_id']);
+                          $stmt = $conn->prepare("DELETE FROM tbl_visitors WHERE id = ?");
+                          $stmt->bind_param("i", $id);
+                          if($stmt->execute()) {
+                              echo "<script>alert('Visitor deleted successfully'); window.location.reload();</script>";
+                          } else {
+                              echo "<script>alert('Error deleting visitor: " . $stmt->error . "');</script>";
+                          }
+                          $stmt->close();
+                      }
+                      ?>
                   </div>
                 </td>
               </tr>
               <?php $sn++; }
+              $stmt->close();
             } else {
-              if(isset($_GET['ids'])){
-                $id = $_GET['ids'];
-                $delete_query = mysqli_query($conn, "delete from tbl_visitors where id='$id'");
+              if(isset($_POST['delete_visitor_id'])){
+                $id_to_delete = $_POST['delete_visitor_id'];
+                $stmt = $conn->prepare("DELETE FROM tbl_visitors WHERE id=?");
+                $stmt->bind_param("i", $id_to_delete);
+                if ($stmt->execute()) {
+                    echo "<script>alert('Visitor deleted successfully');</script>";
+                    echo "<script>window.location.href='manage-visitors.php';</script>";
+                } else {
+                    echo "<script>alert('Error deleting visitor: " . $stmt->error . "');</script>";
+                }
+                $stmt->close();
               }
               $select_query = mysqli_query($conn, "select * from tbl_visitors ORDER BY created_at DESC");
               $sn = 1;
@@ -149,9 +197,12 @@ if(empty($id))
                   <a href="edit-visitor.php?id=<?php echo $row['id'];?>" class="btn btn-sm btn-outline-primary">
                     <i class="fa-solid fa-pencil me-1"></i><?php echo $row['status']==1 ? 'Edit' : 'View'; ?>
                   </a>
-                  <a href="manage-visitors.php?ids=<?php echo $row['id'];?>" class="btn btn-sm btn-outline-danger" onclick="return confirmDelete()">
-                    <i class="fa-solid fa-trash me-1"></i>Delete
-                  </a>
+                  <form method="POST" action="manage-visitors.php" onsubmit="return confirmDelete()">
+                      <input type="hidden" name="delete_visitor_id" value="<?php echo $row['id']; ?>">
+                      <button type="submit" class="btn btn-sm btn-outline-danger">
+                          <i class="fa-solid fa-trash me-1"></i>Delete
+                      </button>
+                  </form>
                 </div>
               </td>
             </tr>
@@ -205,9 +256,12 @@ if(empty($id))
               <td><?php echo date('M j, Y H:i', strtotime($row_reg['created_at'])); ?></td>
               <td>
                 <div class="d-flex gap-2">
-                  <a href="manage-visitors.php?del_reg=<?php echo $row_reg['id'];?>" class="btn btn-sm btn-outline-danger" onclick="return confirmDeleteRegistration()">
-                    <i class="fa-solid fa-trash me-1"></i>Delete
-                  </a>
+                  <form method="POST" action="manage-visitors.php" onsubmit="return confirmDeleteRegistration()">
+                      <input type="hidden" name="delete_reg_id" value="<?php echo $row_reg['id']; ?>">
+                      <button type="submit" class="btn btn-sm btn-outline-danger">
+                          <i class="fa-solid fa-trash me-1"></i>Delete
+                      </button>
+                  </form>
                 </div>
               </td>
             </tr>
@@ -229,13 +283,25 @@ if(empty($id))
 
 <?php
 // Handle registration deletion
-if(isset($_GET['del_reg'])){
-    $reg_id = $_GET['del_reg'];
-    $delete_reg_query = mysqli_query($conn, "DELETE FROM event_registrations WHERE id='$reg_id'");
-    if($delete_reg_query){
+if(isset($_POST['delete_reg_id'])){
+    // Validate CSRF token
+    if (!isset($_POST['csrf_token']) || $_POST['csrf_token'] !== $_SESSION['csrf_token']) {
+        die("Invalid CSRF token");
+    }
+    
+    $reg_id = filter_input(INPUT_POST, 'delete_reg_id', FILTER_VALIDATE_INT);
+    if (!$reg_id) {
+        die("Invalid registration ID");
+    }
+    $stmt = $conn->prepare("DELETE FROM event_registrations WHERE id=?");
+    $stmt->bind_param("i", $reg_id);
+    if($stmt->execute()){
         echo "<script>alert('Registration deleted successfully');</script>";
         echo "<script>window.location.href='manage-visitors.php';</script>";
+    } else {
+        echo "<script>alert('Error deleting registration: " . $stmt->error . "');</script>";
     }
+    $stmt->close();
 }
 ?>
 

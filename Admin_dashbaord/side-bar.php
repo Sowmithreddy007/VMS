@@ -57,7 +57,7 @@ $has_events = ($events_res && mysqli_num_rows($events_res) > 0);
                 $name = htmlspecialchars($ev['event_name']);
                 echo "
                 <li>
-                  <a href='view_event.php?event_id={$id}' class='nav-link d-flex align-items-center ms-4'>
+                  <a href='view-event.php?event_id={$id}' class='nav-link d-flex align-items-center ms-4'>
                     <i class='bi bi-pin-angle-fill me-2'></i> {$name}
                   </a>
                 </li>";
