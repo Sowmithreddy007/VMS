@@ -11,8 +11,8 @@ if (empty($id)) {
 // ================= Dashboard Stats =================
 $total_visitors = mysqli_fetch_row(mysqli_query($conn, "SELECT COUNT(*) FROM tbl_visitors"));
 $checked_in = mysqli_fetch_row(mysqli_query($conn, "SELECT COUNT(*) FROM tbl_visitors WHERE status=1 AND in_time IS NOT NULL"));
-$goodies_given = mysqli_fetch_row(mysqli_query($conn, "SELECT SUM(quantity) FROM tbl_goodies_distribution"));
-$event_participants = mysqli_fetch_row(mysqli_query($conn, "SELECT SUM(participant_count) FROM tbl_event_participation"));
+$goodies_given = mysqli_fetch_row(mysqli_query($conn, "SELECT COALESCE(SUM(quantity), 0) FROM tbl_goodies_distribution"));
+$event_participants = mysqli_fetch_row(mysqli_query($conn, "SELECT COALESCE(SUM(participant_count), 0) FROM tbl_event_participation"));
 
 // ================= Visitor Data =================
 $visitors = mysqli_query($conn, "SELECT * FROM tbl_visitors ORDER BY created_at DESC LIMIT 10");

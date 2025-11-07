@@ -15,7 +15,7 @@ if (empty($_SESSION['csrf_token'])) {
 }
 $server="localhost";
 $username="root";
-$password="Somwith@07";
+$password="Sowmith@0707";
 $databasename="vms_db";
 
 // Create database connection with error handling

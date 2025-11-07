@@ -12,8 +12,20 @@ $search_results = [];
 $search_term = '';
 $event_id = '';
 
+// Debug information
+error_log("Session ID: " . session_id());
+error_log("User ID: " . ($id ?? 'Not set'));
+
+// Check database connection
+if ($conn->connect_error) {
+    error_log("Connection failed: " . $conn->connect_error);
+    die("Connection failed: " . $conn->connect_error);
+}
+
 // Handle search
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['search'])) {
+    error_log("Search initiated with term: " . ($_POST['search_term'] ?? 'empty'));
+    error_log("Event ID: " . ($_POST['event_id'] ?? 'not selected'));
     $search_term = trim($_POST['search_term']);
     $event_id = intval($_POST['event_id']);
     
@@ -36,14 +48,28 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['search'])) {
     
     $sql .= " ORDER BY created_at DESC";
     
+    error_log("SQL Query: " . $sql);
+    
     $stmt = $conn->prepare($sql);
     if (!empty($params)) {
         $stmt->bind_param($types, ...$params);
+        error_log("Bound parameters: " . implode(", ", $params));
     }
-    $stmt->execute();
-    $result = $stmt->get_result();
-    $search_results = $result->fetch_all(MYSQLI_ASSOC);
-    $stmt->close();
+    
+    try {
+        if (!$stmt->execute()) {
+            error_log("Query execution failed: " . $stmt->error);
+            throw new Exception("Query execution failed: " . $stmt->error);
+        }
+        $result = $stmt->get_result();
+        $search_results = $result->fetch_all(MYSQLI_ASSOC);
+        error_log("Found " . count($search_results) . " results");
+    } catch (Exception $e) {
+        error_log("Error executing query: " . $e->getMessage());
+        die("An error occurred while searching. Please check the error log for details.");
+    } finally {
+        $stmt->close();
+    }
 }
 
 // Handle import

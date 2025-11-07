@@ -15,6 +15,10 @@ if(empty($id)) {
 $message = '';
 $message_type = '';
 
+// Fetch available events
+$events_query = mysqli_query($conn, "SELECT event_id, event_name, event_date FROM tbl_events ORDER BY event_date DESC");
+$events = mysqli_fetch_all($events_query, MYSQLI_ASSOC);
+
 // Handle file upload
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_FILES['excel_file'])) {
     $event_id = intval($_POST['event_id']);
@@ -25,49 +29,89 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_FILES['excel_file'])) {
         $allowed_ext = ['xlsx', 'xls', 'csv'];
         
         if (in_array($file_ext, $allowed_ext)) {
-            try {
-                $spreadsheet = IOFactory::load($file['tmp_name']);
-                $sheet = $spreadsheet->getActiveSheet();
-                $rows = $sheet->toArray();
-                
+            $error_messages = array();
                 $imported_count = 0;
                 $failed_count = 0;
-                
-                // Skip header row (assuming first row is headers)
-                for ($i = 1; $i < count($rows); $i++) {
-                    $row = $rows[$i];
+
+                try {
+                    $spreadsheet = IOFactory::load($file['tmp_name']);
+                    $sheet = $spreadsheet->getActiveSheet();
+                    $rows = $sheet->toArray();
                     
-                    // Map columns (adjust based on your Excel structure)
-                    $name = $row[0] ?? '';
-                    $email = $row[1] ?? '';
-                    $mobile = $row[2] ?? '';
-                    $address = $row[3] ?? '';
-                    $department = $row[4] ?? '';
-                    $gender = $row[5] ?? '';
-                    $year_of_graduation = $row[6] ?? '';
-                    
-                    if (!empty($name)) {
-                        // Insert into excel imports table
-                        $sql = "INSERT INTO tbl_excel_imports (event_id, name, email, mobile, address, department, gender, year_of_graduation, excel_file_name, import_status) 
-                                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending')";
-                        $stmt = $conn->prepare($sql);
-                        $stmt->bind_param("issssssss", $event_id, $name, $email, $mobile, $address, $department, $gender, $year_of_graduation, $file['name']);
+                    // Skip header row (assuming first row is headers)
+                    for ($i = 1; $i < count($rows); $i++) {
+                        $row = $rows[$i];
                         
-                        if ($stmt->execute()) {
-                            $imported_count++;
+                        // Skip completely empty rows
+                        if (empty(array_filter($row))) {
+                            continue;
+                        }
+                        
+                        // Map columns (adjust based on your Excel structure)
+                        $name = trim($row[0] ?? '');
+                        $email = trim($row[1] ?? '');
+                        $mobile = trim($row[2] ?? '');
+                        $address = trim($row[3] ?? '');
+                        $department = trim($row[4] ?? '');
+                        $gender = trim($row[5] ?? '');
+                        $year_of_graduation = trim($row[6] ?? '');
+                        
+                        // Validate required fields
+                        if (empty($name) || empty($email) || empty($mobile)) {
+                            $failed_count++;
+                            $error_messages[] = "Row " . ($i + 1) . ": Missing required fields (name, email, or mobile)";
+                            continue;
+                        }
+                        
+                        // Validate email format
+                        if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+                            $failed_count++;
+                            $error_messages[] = "Row " . ($i + 1) . ": Invalid email format";
+                            continue;
+                        }
+                        
+                        // Insert into database
+                        $stmt = $conn->prepare("INSERT INTO tbl_visitors (event_id, name, email, mobile, address, department, gender, year_of_graduation, added_by, visitor_type) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'regular')");
+                        
+                        if ($stmt) {
+                            $stmt->bind_param("isssssssi", 
+                                $event_id, 
+                                $name, 
+                                $email, 
+                                $mobile, 
+                                $address, 
+                                $department, 
+                                $gender, 
+                                $year_of_graduation, 
+                                $_SESSION['id']
+                            );
+                            
+                            if ($stmt->execute()) {
+                                $imported_count++;
+                            } else {
+                                $failed_count++;
+                                $error_messages[] = "Row " . ($i + 1) . ": " . $stmt->error;
+                            }
+                            $stmt->close();
                         } else {
                             $failed_count++;
+                            $error_messages[] = "Row " . ($i + 1) . ": Failed to prepare statement";
                         }
-                        $stmt->close();
                     }
+                    
+                    if ($imported_count > 0) {
+                        $message = "Import completed. Successfully imported: $imported_count, Failed: $failed_count";
+                        $message_type = ($failed_count > 0) ? 'warning' : 'success';
+                    } else {
+                        $message = "No records were imported. Failed attempts: $failed_count";
+                        $message_type = 'danger';
+                    }
+                    
+                } catch (Exception $e) {
+                    $message = "Error processing file: " . $e->getMessage();
+                    $message_type = 'danger';
+                    $error_messages[] = $e->getMessage();
                 }
-                
-                $message = "Excel file imported successfully. Imported: $imported_count, Failed: $failed_count";
-                $message_type = 'success';
-            } catch (Exception $e) {
-                $message = "Error processing Excel file: " . $e->getMessage();
-                $message_type = 'error';
-            }
         } else {
             $message = "Invalid file type. Please upload Excel or CSV files.";
             $message_type = 'error';

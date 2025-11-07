@@ -1,6 +1,19 @@
 <?php
 session_start();
+
+// Include the connection file to establish the database connection
 include('connection.php');
+
+// Check if the connection is successful
+if ($conn->connect_error) {
+    die("Connection failed: " . $conn->connect_error);
+}
+
+// Fetch departments
+$departments = $conn->query("SELECT department FROM tbl_department WHERE status = 1");
+
+// Fetch events
+$events = $conn->query("SELECT event_id, event_name FROM tbl_events");
 
 // Initialize variables
 $popup_message = '';
@@ -30,10 +43,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['sbt-vstr'])) {
             $popup_type = 'warning';
         } else {
             // Insert into database using prepared statements
-            $stmt = $conn->prepare("INSERT INTO tbl_visitors (event_id, name, email, mobile, address, department, gender, year_of_graduation, in_time, added_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?, NOW(), ?)");
+            $stmt = $conn->prepare("INSERT INTO tbl_visitors (event_id, name, email, mobile, address, department, gender, year_of_graduation, added_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)");
             
             if ($stmt) {
-                $stmt->bind_param("isssssssis", $event_id, $fullname, $email, $mobile, $address, $department, $gender, $year, $_SESSION['id']);
+                $stmt->bind_param("isssssssi", $event_id, $fullname, $email, $mobile, $address, $department, $gender, $year, $_SESSION['id']);
                 
                 if ($stmt->execute()) {
                     $popup_message = "Visitor registered successfully!";
@@ -45,10 +58,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['sbt-vstr'])) {
                     $popup_type = "danger";
                 }
                 $stmt->close();
+            } else {
+                $popup_message = "Error preparing statement: " . $conn->error;
+                $popup_type = "danger";
             }
         }
     }
 }
+
+// Log any errors to error.log
+if (!empty($popup_message) && $popup_type === 'danger') {
+    error_log($popup_message);
+}
+?>
 ?>
 
 <!-- HTML Form -->
@@ -56,6 +78,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['sbt-vstr'])) {
     <!-- Add CSS link here -->
     <link rel="stylesheet" href="css/style.css">
     <link rel="stylesheet" href="css/sb-admin.min.css">
+    <link rel="stylesheet" href="plugins/animate.min.css">
+    <link rel="stylesheet" href="plugins/metisMenu.min.css">
+    <link rel="stylesheet" href="plugins/bootstrap-select.min.css">
     
     <div class="row g-4">
         <div class="col-12">
@@ -111,7 +136,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['sbt-vstr'])) {
             <div class="col-12 col-md-6">
                 <div class="form-floating">
                     <select name="department" class="form-control" required>
-                        <?php // Department options looping code here ?>
+                        <?php while ($dept = mysqli_fetch_assoc($departments)) { ?>
+                            <option value="<?php echo $dept['department']; ?>"><?php echo $dept['department']; ?></option>
+                        <?php } ?>
                     </select>
                     <label>Department <span class="text-danger">*</span></label>
                 </div>
@@ -121,7 +148,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['sbt-vstr'])) {
             <div class="col-12 col-md-6">
                 <div class="form-floating">
                     <select name="event_id" class="form-control" required>
-                        <?php // Event options looping code here ?>
+                        <?php while ($event = mysqli_fetch_assoc($events)) { ?>
+                            <option value="<?php echo $event['event_id']; ?>"><?php echo $event['event_name']; ?></option>
+                        <?php } ?>
                     </select>
                     <label>Event <span class="text-danger">*</span></label>
                 </div>
@@ -131,7 +160,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['sbt-vstr'])) {
             <div class="col-12 col-md-6">
                 <div class="form-floating">
                     <select name="gender" class="form-control" required>
-                        <?php // Gender options here ?>
+                        <?php $genders = ['Male', 'Female', 'Other']; ?>
+                        <?php foreach ($genders as $gender) { ?>
+                            <option value="<?php echo $gender; ?>"><?php echo $gender; ?></option>
+                        <?php } ?>
                     </select>
                     <label>Gender <span class="text-danger">*</span></label>
                 </div>
@@ -141,7 +173,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['sbt-vstr'])) {
             <div class="col-12 col-md-6">
                 <div class="form-floating">
                     <select name="year_of_graduation" class="form-control" required>
-                        <?php // Year options here ?>
+                        <?php $years = range(date('Y') - 5, date('Y') + 5); ?>
+                        <?php foreach ($years as $year) { ?>
+                            <option value="<?php echo $year; ?>"><?php echo $year; ?></option>
+                        <?php } ?>
                     </select>
                     <label>Year of Graduation <span class="text-danger">*</span></label>
                 </div>
